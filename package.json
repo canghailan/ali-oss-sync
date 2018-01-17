@@ -1,0 +1,14 @@
+{
+  "name": "ali-oss-sync",
+  "version": "1.0.0",
+  "description": "阿里云OSS同步",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test"
+  },
+  "author": "huhao",
+  "license": "MIT",
+  "dependencies": {
+    "ali-oss": "^4.11.4"
+  }
+}
