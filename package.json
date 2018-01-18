@@ -1,6 +1,6 @@
 {
   "name": "ali-oss-sync",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "阿里云OSS同步",
   "main": "index.js",
   "scripts": {
@@ -8,8 +8,11 @@
   },
   "author": "huhao <415328529@qq.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/canghailan/ali-oss-sync.git"
+  },
   "dependencies": {
-    "ali-oss": "^4.11.4",
-    "bluebird": "^3.5.1"
+    "ali-oss": "^4.11.4"
   }
 }

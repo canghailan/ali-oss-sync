@@ -1,13 +1,26 @@
-const fs = require("bluebird").promisifyAll(require("fs"));
+const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const url = require("url");
 const oss = require("ali-oss").Wrapper;
 
+const promisify = (fn, receiver) => {
+  return (...args) => {
+    return new Promise((resolve, reject) => {
+      fn.apply(receiver, [...args, (err, res) => {
+        return err ? reject(err) : resolve(res);
+      }]);
+    });
+  };
+};
+
+fs.statAsync = promisify(fs.stat, fs);
+fs.readdirAsync = promisify(fs.readdir, fs);
+
 const auth = /([^:]+):(.+)/;
 const host = /([^.]+).(.+)/;
 
-module.exports = async function(source, target) {
+module.exports = async(source, target) => {
   let targetUri = url.parse(target);
   let [, username, password] = targetUri.auth.match(auth);
   let [, bucketName, endpoint] = targetUri.hostname.match(host);
@@ -74,24 +87,28 @@ async function apply(bucket, prefix, directory, diff) {
   let r = diff.map(async cmd => {
     switch (cmd.type) {
       case "+":
-      case "*": {
-        await bucket.put(prefix + cmd.key, path.join(directory, cmd.key));
-        console.log(`${cmd.type} ${cmd.key}`);
-        return cmd;
-      }
-      case "-": {
-        await bucket.delete(prefix + cmd.key);
-        console.log(`${cmd.type} ${cmd.key}`);
-        return cmd;
-      }
-      case "=": {
-        console.log(`${cmd.type} ${cmd.key}`);
-        return cmd;
-      }
-      default: {
-        console.error(cmd);
-        return cmd;
-      }
+      case "*":
+        {
+          await bucket.put(prefix + cmd.key, path.join(directory, cmd.key));
+          console.log(`${cmd.type} ${cmd.key}`);
+          return cmd;
+        }
+      case "-":
+        {
+          await bucket.delete(prefix + cmd.key);
+          console.log(`${cmd.type} ${cmd.key}`);
+          return cmd;
+        }
+      case "=":
+        {
+          console.log(`${cmd.type} ${cmd.key}`);
+          return cmd;
+        }
+      default:
+        {
+          console.error(cmd);
+          return cmd;
+        }
     }
   });
   return Promise.all(r);
@@ -106,18 +123,16 @@ async function listFiles(start, rel) {
       .map(file => {
         return listFiles(start, rel ? rel + "/" + file : file);
       })
-      .reduce(async (a1, a2) => {
+      .reduce(async(a1, a2) => {
         let aa1 = await a1;
         let aa2 = await a2;
         return aa1.concat(aa2);
       });
   } else {
-    return [
-      {
-        key: rel,
-        md5: await md5(p)
-      }
-    ];
+    return [{
+      key: rel,
+      md5: await md5(p)
+    }];
   }
 }
 
@@ -136,13 +151,13 @@ async function listObjects(bucket, prefix, marker) {
 }
 
 function md5(file) {
-  return new Promise(function(resolve, reject) {
+  return new Promise((resolve, reject) => {
     let hash = crypto.createHash("md5");
     let stream = fs.createReadStream(file);
-    stream.on("data", function(data) {
+    stream.on("data", (data) => {
       hash.update(data);
     });
-    stream.on("end", function() {
+    stream.on("end", () => {
       resolve(hash.digest("hex"));
     });
   });
