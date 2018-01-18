@@ -147,7 +147,7 @@ async function listObjects(bucket, prefix, marker) {
   if (r.nextMarker == null) {
     return objects;
   } else {
-    return objects.concat(listObjects(bucket, prefix, r.nextMarker));
+    return objects.concat(await listObjects(bucket, prefix, r.nextMarker));
   }
 }
 
