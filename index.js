@@ -1,18 +1,20 @@
 const fs = require("bluebird").promisifyAll(require("fs"));
 const path = require("path");
 const crypto = require("crypto");
-const { URL } = require("url");
+const url = require("url");
 const oss = require("ali-oss").Wrapper;
 
+const auth = /([^:]+):(.+)/;
 const host = /([^.]+).(.+)/;
 
 module.exports = async function(source, target) {
-  let targetUri = new URL(target);
+  let targetUri = url.parse(target);
+  let [, username, password] = targetUri.auth.match(auth);
   let [, bucketName, endpoint] = targetUri.hostname.match(host);
   let prefix = targetUri.pathname.substring(1);
   let bucket = oss({
-    accessKeyId: targetUri.username,
-    accessKeySecret: targetUri.password,
+    accessKeyId: username,
+    accessKeySecret: password,
     bucket: bucketName,
     endpoint: endpoint
   });
