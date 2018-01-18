@@ -1,12 +1,8 @@
-const util = require("util");
-const fs = require("fs");
+const fs = require("bluebird").promisifyAll(require("fs"));
 const path = require("path");
 const crypto = require("crypto");
 const { URL } = require("url");
 const oss = require("ali-oss").Wrapper;
-
-const stat = util.promisify(fs.stat);
-const readdir = util.promisify(fs.readdir);
 
 const host = /([^.]+).(.+)/;
 
@@ -101,9 +97,9 @@ async function apply(bucket, prefix, directory, diff) {
 
 async function listFiles(start, rel) {
   let p = rel ? path.join(start, rel) : start;
-  let s = await stat(p);
+  let s = await fs.statAsync(p);
   if (s.isDirectory()) {
-    let files = await readdir(p);
+    let files = await fs.readdirAsync(p);
     return files
       .map(file => {
         return listFiles(start, rel ? rel + "/" + file : file);

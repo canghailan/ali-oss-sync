@@ -1,14 +1,15 @@
 {
   "name": "ali-oss-sync",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "阿里云OSS同步",
   "main": "index.js",
   "scripts": {
     "test": "node test"
   },
-  "author": "huhao",
+  "author": "huhao <415328529@qq.com>",
   "license": "MIT",
   "dependencies": {
-    "ali-oss": "^4.11.4"
+    "ali-oss": "^4.11.4",
+    "bluebird": "^3.5.1"
   }
 }
