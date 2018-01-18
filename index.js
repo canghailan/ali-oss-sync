@@ -1,10 +1,11 @@
+const util = require("util");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const url = require("url");
 const oss = require("ali-oss").Wrapper;
 
-const promisify = (fn, receiver) => {
+const promisify = util.promisify || function(fn, receiver) {
   return (...args) => {
     return new Promise((resolve, reject) => {
       fn.apply(receiver, [...args, (err, res) => {
