@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const url = require("url");
 const oss = require("ali-oss").Wrapper;
 
-const promisify = util.promisify || function(fn, receiver) {
+const promisify = util.promisify || function (fn, receiver) {
   return (...args) => {
     return new Promise((resolve, reject) => {
       fn.apply(receiver, [...args, (err, res) => {
@@ -21,39 +21,81 @@ fs.readdirAsync = promisify(fs.readdir, fs);
 const auth = /([^:]+):(.+)/;
 const host = /([^.]+).(.+)/;
 
-module.exports = async(source, target) => {
-  let targetUri = url.parse(target);
+module.exports = async(...args) => {
+  let context = {};
+  if (args.length === 1) {
+    let [option] = args;
+    Object.assign(context, option);
+  } else {
+    let [source, target, headers] = args;
+    context.source = source;
+    context.target = target;
+    context.headers = headers;
+  }
+
+  return sync(init(context));
+};
+
+function init(context) {
+  let targetUri = url.parse(context.target);
   let [, username, password] = targetUri.auth.match(auth);
   let [, bucketName, endpoint] = targetUri.hostname.match(host);
-  let prefix = targetUri.pathname.substring(1);
-  let bucket = oss({
+  context.targetBucket = oss({
     accessKeyId: username,
     accessKeySecret: password,
     bucket: bucketName,
     endpoint: endpoint
   });
+  context.targetPrefix = targetUri.pathname.substring(1);
 
-  return sync(bucket, prefix, source);
-};
-
-async function sync(bucket, prefix, directory) {
-  return apply(
-    bucket,
-    prefix,
-    directory,
-    diff(prefix, await listFiles(directory), await listObjects(bucket, prefix))
-  );
+  return context;
 }
 
-function diff(prefix, files, objects) {
-  let index = new Map();
-  objects.forEach(object => {
-    index.set(object.name.substring(prefix.length), object);
+async function sync(context) {
+  let files = await listFiles(context.source);
+  let objects = await listObjects(context.targetBucket, context.targetPrefix);
+  let objectIndex = newObjectIndex(context.targetPrefix, objects);
+  return apply(context, diff(files, objectIndex));
+}
+
+async function apply(context, diff) {
+  let r = diff.map(async action => {
+    switch (action.type) {
+      case "+":
+      case "*":
+        {
+          await context.targetBucket.put(context.targetPrefix + action.key, path.join(context.source, action.key), {
+            headers: context.headers
+          });
+          console.log(`${action.type} ${action.key}`);
+          return action;
+        }
+      case "-":
+        {
+          await context.targetBucket.delete(prefix + action.key);
+          console.log(`${action.type} ${action.key}`);
+          return action;
+        }
+      case "=":
+        {
+          console.log(`${action.type} ${action.key}`);
+          return action;
+        }
+      default:
+        {
+          console.error(action);
+          return action;
+        }
+    }
   });
+  return Promise.all(r);
+}
+
+function diff(files, objectIndex) {
   let list = files.map(file => {
-    let object = index.get(file.key);
+    let object = objectIndex.get(file.key);
     if (object) {
-      index.delete(file.key);
+      objectIndex.delete(file.key);
       if (object.etag.slice(1, -1).toLowerCase() === file.md5) {
         return {
           type: "=",
@@ -75,7 +117,7 @@ function diff(prefix, files, objects) {
       };
     }
   });
-  index.forEach((object, key) => {
+  objectIndex.forEach((object, key) => {
     list.push({
       type: "-",
       key: key
@@ -84,35 +126,26 @@ function diff(prefix, files, objects) {
   return list;
 }
 
-async function apply(bucket, prefix, directory, diff) {
-  let r = diff.map(async cmd => {
-    switch (cmd.type) {
-      case "+":
-      case "*":
-        {
-          await bucket.put(prefix + cmd.key, path.join(directory, cmd.key));
-          console.log(`${cmd.type} ${cmd.key}`);
-          return cmd;
-        }
-      case "-":
-        {
-          await bucket.delete(prefix + cmd.key);
-          console.log(`${cmd.type} ${cmd.key}`);
-          return cmd;
-        }
-      case "=":
-        {
-          console.log(`${cmd.type} ${cmd.key}`);
-          return cmd;
-        }
-      default:
-        {
-          console.error(cmd);
-          return cmd;
-        }
-    }
+function newObjectIndex(prefix, objects) {
+  let index = new Map();
+  objects.forEach(object => {
+    index.set(object.name.substring(prefix.length), object);
   });
-  return Promise.all(r);
+  return index;
+}
+
+async function listObjects(bucket, prefix, marker) {
+  let r = await bucket.list({
+    prefix: prefix,
+    "max-keys": 1000,
+    marker: marker
+  });
+  let objects = r.objects || [];
+  if (r.nextMarker == null) {
+    return objects;
+  } else {
+    return objects.concat(await listObjects(bucket, prefix, r.nextMarker));
+  }
 }
 
 async function listFiles(start, rel) {
@@ -134,20 +167,6 @@ async function listFiles(start, rel) {
       key: rel,
       md5: await md5(p)
     }];
-  }
-}
-
-async function listObjects(bucket, prefix, marker) {
-  let r = await bucket.list({
-    prefix: prefix,
-    "max-keys": 1000,
-    marker: marker
-  });
-  let objects = r.objects || [];
-  if (r.nextMarker == null) {
-    return objects;
-  } else {
-    return objects.concat(await listObjects(bucket, prefix, r.nextMarker));
   }
 }
 
