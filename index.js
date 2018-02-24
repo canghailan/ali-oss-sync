@@ -72,7 +72,7 @@ async function apply(context, diff) {
         }
       case "-":
         {
-          await context.targetBucket.delete(prefix + action.key);
+          await context.targetBucket.delete(context.targetPrefix + action.key);
           console.log(`${action.type} ${action.key}`);
           return action;
         }
